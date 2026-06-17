@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pesawat - WA Blast</title>
+  <script src="lib/xlsx.full.min.js"></script>
+  <script src="lib/phone.js"></script>
+  <style>
+    :root {
+      --primary: #25D366;
+      --primary-dark: #128C7E;
+      --primary-light: #DCF8C6;
+      --bg: #F0F2F5;
+      --card: #FFFFFF;
+      --text: #111B21;
+      --text-secondary: #667781;
+      --border: #E9EDEF;
+      --error: #EF4444;
+      --success: #22C55E;
+      --warning: #F59E0B;
+      --radius: 12px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      width: 100%;
+      min-width: 320px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Header */
+    .header {
+      background: var(--primary);
+      color: white;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header-icon {
+      width: 32px;
+      height: 32px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .header-title { font-size: 16px; font-weight: 700; }
+    .header-subtitle { font-size: 11px; opacity: 0.85; }
+
+    /* Step Indicators */
+    .steps {
+      display: flex;
+      padding: 16px 20px 0;
+      gap: 8px;
+      align-items: center;
+    }
+    .step-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+    .step-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+      transition: all 0.3s;
+      border: 2px solid var(--border);
+      background: white;
+      color: var(--text-secondary);
+    }
+    .step-dot.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+    .step-dot.done {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+    .step-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      font-weight: 500;
+    }
+    .step-label.active { color: var(--text); font-weight: 600; }
+    .step-label.done { color: var(--primary); }
+    .step-line {
+      flex: 1;
+      height: 2px;
+      background: var(--border);
+      min-width: 12px;
+    }
+    .step-line.done { background: var(--primary); }
+
+    /* Content */
+    .content {
+      padding: 16px 20px 20px;
+    }
+    .step-panel { display: none; }
+    .step-panel.active { display: block; }
+
+    /* Cards */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+      margin-bottom: 12px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Drop Zone */
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .dropzone:hover, .dropzone.drag-over {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+    .dropzone-icon {
+      font-size: 40px;
+      margin-bottom: 8px;
+      opacity: 0.5;
+    }
+    .dropzone-text { color: var(--text-secondary); font-size: 13px; }
+    .dropzone-text strong { color: var(--text); }
+    .dropzone-hint {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+    .dropzone.has-file { border-color: var(--success); background: #F0FDF4; }
+
+    /* File Info */
+    .file-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #F0FDF4;
+      border: 1px solid #BBF7D0;
+      border-radius: 8px;
+      margin-top: 12px;
+    }
+    .file-info-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--success);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .file-info-name { font-weight: 600; font-size: 13px; }
+    .file-info-meta { font-size: 11px; color: var(--text-secondary); }
+    .file-info-remove {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 18px;
+      padding: 4px;
+    }
+    .file-info-remove:hover { color: var(--error); }
+
+    /* Column Tags */
+    .columns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .column-tag {
+      background: #F0F2F5;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    .column-tag var {
+      color: var(--primary);
+      font-style: normal;
+      font-weight: 600;
+    }
+
+    /* Form Elements */
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    textarea, input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: inherit;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s;
+      background: white;
+    }
+    textarea:focus, input:focus { border-color: var(--primary); }
+    textarea { min-height: 80px; }
+
+    /* Preview Box */
+    .preview-box {
+      background: #F0F2F5;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 8px;
+      font-size: 13px;
+      line-height: 1.6;
+      min-height: 50px;
+      border-left: 3px solid var(--primary);
+      white-space: pre-wrap;
+    }
+    .preview-box .placeholder {
+      color: var(--text-secondary);
+      font-style: italic;
+    }
+
+    /* Placeholder Hints */
+    .hints {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+    }
+    .hint {
+      background: var(--primary-light);
+      color: var(--primary-dark);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .hint:hover { background: #B9F0C0; }
+
+    /* Slider */
+    .slider-container { margin-top: 8px; }
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: var(--border);
+      border-radius: 3px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      background: var(--primary);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .slider-value {
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--primary-dark);
+      margin-top: 4px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+    .btn-primary:hover:not(:disabled) { background: #20BD5A; }
+    .btn-secondary {
+      background: var(--bg);
+      color: var(--text);
+    }
+    .btn-secondary:hover:not(:disabled) { background: #E2E5E8; }
+    .btn-danger {
+      background: var(--error);
+      color: white;
+    }
+    .btn-danger:hover:not(:disabled) { background: #DC2626; }
+    .btn-warning {
+      background: var(--warning);
+      color: white;
+    }
+    .btn-warning:hover:not(:disabled) { background: #D97706; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+    /* Navigation */
+    .nav {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .nav .btn { flex: 1; }
+
+    /* Step 3 - Dashboard */
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .stat-card {
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .stat-card.primary { background: var(--primary-light); }
+    .stat-card.success { background: #F0FDF4; }
+    .stat-card.error { background: #FEF2F2; }
+    .stat-card.warning { background: #FFFBEB; }
+    .stat-number { font-size: 22px; font-weight: 700; }
+    .stat-label { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+    .stat-card.primary .stat-number { color: var(--primary-dark); }
+    .stat-card.success .stat-number { color: var(--success); }
+    .stat-card.error .stat-number { color: var(--error); }
+    .stat-card.warning .stat-number { color: var(--warning); }
+
+    /* Progress Bar */
+    .progress-container {
+      margin-top: 12px;
+    }
+    .progress-bar-bg {
+      height: 8px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), #20BD5A);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+    .progress-text {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* Log */
+    .log-container {
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 8px;
+    }
+    .log-container::-webkit-scrollbar {
+      width: 4px;
+    }
+    .log-container::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+    .log-entry {
+      padding: 6px 10px;
+      margin-bottom: 4px;
+      border-radius: 6px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .log-entry.success { background: #F0FDF4; border-left: 3px solid var(--success); }
+    .log-entry.error { background: #FEF2F2; border-left: 3px solid var(--error); }
+    .log-entry.info { background: #F0F2F5; border-left: 3px solid var(--primary); }
+    .log-entry .log-phone { font-weight: 600; }
+    .log-entry .log-status { font-weight: 500; }
+    .log-entry .log-time { font-size: 10px; color: var(--text-secondary); }
+
+    /* Toast / Notification */
+    .toast {
+      position: fixed;
+      bottom: 16px;
+      left: 16px;
+      right: 16px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      z-index: 100;
+      animation: slideUp 0.3s ease;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .toast.error { background: var(--error); color: white; }
+    .toast.success { background: var(--success); color: white; }
+    .toast.info { background: var(--text); color: white; }
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Status badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge.running { background: var(--primary-light); color: var(--primary-dark); }
+    .badge.paused { background: #FFFBEB; color: var(--warning); }
+    .badge.idle { background: #F0F2F5; color: var(--text-secondary); }
+    .badge.completed { background: #F0FDF4; color: var(--success); }
+    .badge.stopped { background: #FEF2F2; color: var(--error); }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-icon">P</div>
+      <div>
+        <div class="header-title">Pesawat</div>
+        <div class="header-subtitle">Pesan Masal Secepat Kilat</div>
+      </div>
+      <div style="margin-left:auto">
+        <span id="statusBadge" class="badge idle">Siaga</span>
+      </div>
+    </div>
+
+    <!-- Step Indicators -->
+    <div class="steps">
+      <div class="step-indicator">
+        <div class="step-dot active" id="dot1">1</div>
+        <span class="step-label active" id="label1">Data</span>
+        <div class="step-line" id="line1"></div>
+      </div>
+      <div class="step-indicator">
+        <div class="step-dot" id="dot2">2</div>
+        <span class="step-label" id="label2">Pesan</span>
+        <div class="step-line" id="line2"></div>
+      </div>
+      <div class="step-indicator">
+        <div class="step-dot" id="dot3">3</div>
+        <span class="step-label" id="label3">Kirim</span>
+        <div class="step-line" id="line3" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <!-- Step 1: Data Setup -->
+      <div class="step-panel active" id="step1">
+        <div class="card">
+          <div class="card-title">Upload Data</div>
+          <div class="dropzone" id="dropzone">
+            <div class="dropzone-icon">📁</div>
+            <div class="dropzone-text">
+              <strong>Klik</strong> atau <strong>tarik file</strong> ke sini
+            </div>
+            <div class="dropzone-hint">Format: .xlsx, .xls, .csv</div>
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
+          </div>
+          <div style="text-align:center;margin-top:8px">
+            <button id="downloadTemplate" class="btn btn-sm btn-secondary">⬇ Download Template</button>
+          </div>
+          <div id="fileInfo" class="file-info" style="display:none">
+            <div class="file-info-icon">✓</div>
+            <div>
+              <div class="file-info-name" id="fileName"></div>
+              <div class="file-info-meta" id="fileMeta"></div>
+            </div>
+            <button class="file-info-remove" id="removeFile">&times;</button>
+          </div>
+        </div>
+
+        <div class="card" id="dataPreview" style="display:none">
+          <div class="card-title">Data Terdeteksi</div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px">
+            <span id="rowCount">0</span> kontak ditemukan
+          </div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">
+            Kolom yang tersedia:
+          </div>
+          <div class="columns" id="columnList"></div>
+          <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+            <label for="countrySelect" style="margin-bottom:0;white-space:nowrap;">Negara Default:</label>
+            <select id="countrySelect" style="padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;background:white;flex:1">
+              <option value="ID">🇮🇩 Indonesia (+62)</option>
+              <option value="US">🇺🇸 Amerika Serikat (+1)</option>
+              <option value="GB">🇬🇧 Inggris (+44)</option>
+              <option value="IN">🇮🇳 India (+91)</option>
+              <option value="CN">🇨🇳 China (+86)</option>
+              <option value="JP">🇯🇵 Jepang (+81)</option>
+              <option value="KR">🇰🇷 Korea (+82)</option>
+              <option value="MY">🇲🇾 Malaysia (+60)</option>
+              <option value="SG">🇸🇬 Singapura (+65)</option>
+              <option value="SA">🇸🇦 Saudi (+966)</option>
+              <option value="AE">🇦🇪 UAE (+971)</option>
+              <option value="EG">🇪🇬 Mesir (+20)</option>
+              <option value="AU">🇦🇺 Australia (+61)</option>
+              <option value="TH">🇹🇭 Thailand (+66)</option>
+              <option value="VN">🇻🇳 Vietnam (+84)</option>
+              <option value="PH">🇵🇭 Filipina (+63)</option>
+              <option value="PK">🇵🇰 Pakistan (+92)</option>
+              <option value="BD">🇧🇩 Bangladesh (+880)</option>
+              <option value="TR">🇹🇷 Turki (+90)</option>
+              <option value="RU">🇷🇺 Rusia (+7)</option>
+              <option value="BR">🇧🇷 Brasil (+55)</option>
+              <option value="MX">🇲🇽 Meksiko (+52)</option>
+              <option value="DE">🇩🇪 Jerman (+49)</option>
+              <option value="FR">🇫🇷 Prancis (+33)</option>
+              <option value="IT">🇮🇹 Italia (+39)</option>
+              <option value="ES">🇪🇸 Spanyol (+34)</option>
+              <option value="NL">🇳🇱 Belanda (+31)</option>
+            </select>
+          </div>
+          <div style="margin-top:8px">
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Pratinjau data:</div>
+            <div style="font-size:12px;max-height:120px;overflow:auto;background:#F9FAFB;border-radius:6px;padding:8px">
+              <table style="width:100%;border-collapse:collapse" id="previewTable">
+                <thead><tr id="previewHeader"></tr></thead>
+                <tbody id="previewBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav">
+          <div></div>
+          <button class="btn btn-primary" id="toStep2" disabled>Lanjutkan →</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Message & Settings -->
+      <div class="step-panel" id="step2">
+        <div class="card">
+          <div class="card-title">Template Pesan</div>
+          <textarea id="messageTemplate" placeholder="Tulis pesan Anda di sini...&#10;&#10;Gunakan {{NamaKolom}} untuk data dinamis&#10;Contoh: Halo {{Nama}}, tagihan Anda Rp{{Tagihan}}"></textarea>
+          <div class="hints" id="placeholderHints"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Pratinjau Pesan</div>
+          <div class="preview-box" id="previewBox">
+            <span class="placeholder">Isi template pesan untuk melihat pratinjau</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Pengaturan Jeda</div>
+          <div class="slider-container">
+            <div class="slider-labels">
+              <span>⬅ Lambat</span>
+              <span>Normal</span>
+              <span>Cepat ➡</span>
+            </div>
+            <input type="range" id="delaySlider" min="1" max="5" value="3" step="1">
+            <div class="slider-value" id="delayValue">3 - 8 detik</div>
+          </div>
+        </div>
+
+        <div class="nav">
+          <button class="btn btn-secondary" id="backTo1">← Kembali</button>
+          <button class="btn btn-primary" id="toStep3">Mulai Blast 🚀</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Live Dashboard -->
+      <div class="step-panel" id="step3">
+        <div class="card">
+          <div class="card-title">Status Eksekusi</div>
+          <div class="stats">
+            <div class="stat-card primary">
+              <div class="stat-number" id="totalCount">0</div>
+              <div class="stat-label">Total</div>
+            </div>
+            <div class="stat-card success">
+              <div class="stat-number" id="successCount">0</div>
+              <div class="stat-label">Berhasil</div>
+            </div>
+            <div class="stat-card error">
+              <div class="stat-number" id="failCount">0</div>
+              <div class="stat-label">Gagal</div>
+            </div>
+            <div class="stat-card warning">
+              <div class="stat-number" id="remainingCount">0</div>
+              <div class="stat-label">Sisa</div>
+            </div>
+          </div>
+          <div class="progress-container">
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">0 / 0</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Log Aktivitas</div>
+          <div class="log-container" id="logContainer">
+            <div style="text-align:center;color:var(--text-secondary);font-size:12px;padding:20px">
+              Menunggu eksekusi dimulai...
+            </div>
+          </div>
+        </div>
+
+        <div class="nav" id="controlButtons">
+          <button class="btn btn-warning" id="pauseBtn" style="display:none">⏸ Jeda</button>
+          <button class="btn btn-primary" id="resumeBtn" style="display:none">▶ Lanjutkan</button>
+          <button class="btn btn-danger" id="stopBtn" style="display:none">⏹ Berhenti</button>
+          <button class="btn btn-primary" id="downloadBtn" style="display:none">⬇ Download Laporan</button>
+        </div>
+        <div class="nav" id="backFrom3" style="margin-top:8px">
+          <button class="btn btn-secondary" id="backTo2">← Edit Pesan</button>
+          <button class="btn btn-secondary" id="finishBtn">Selesai →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align:center;padding:12px 20px;font-size:11px;color:var(--text-secondary);border-top:1px solid var(--border);margin-top:8px">
+    &copy; 2026 | Mohamad Lukman Nurhasyim, S.Kom, Gr.
+  </div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "Pesawat - Pesan Masal Secepat Kilat",
+  "version": "1.0.0",
+  "description": "WhatsApp Blast Chrome Extension - Kirim pesan massal via WhatsApp Web",
+  "permissions": [
+    "sidePanel",
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://web.whatsapp.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_title": "Pesawat - WA Blast"
+  },
+  "web_accessible_resources": [{
+    "resources": ["click.js"],
+    "matches": ["https://web.whatsapp.com/*"]
+  }],
+  "commands": {
+    "start-blast": {
+      "suggested_key": {
+        "default": "Alt+S"
+      },
+      "description": "Start / Resume Blast"
+    },
+    "pause-blast": {
+      "suggested_key": {
+        "default": "Alt+P"
+      },
+      "description": "Pause Blast"
+    }
+  }
+}
