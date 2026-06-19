@@ -66,7 +66,46 @@ function getChatHeaderName() {
   return header ? header.innerText.trim() : "";
 }
 
-async function sendMessage(phone, message) {
+async function attachFiles(attachments, textBox) {
+  const dt = new DataTransfer();
+
+  for (const att of attachments) {
+    const binary = atob(att.base64);
+    const buf = new ArrayBuffer(binary.length);
+    const view = new Uint8Array(buf);
+    for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
+    const blob = new Blob([buf], { type: att.mime });
+    const file = new File([blob], att.name, { type: att.mime });
+    dt.items.add(file);
+  }
+
+  textBox.focus();
+
+  const pasteEvent = new ClipboardEvent('paste', {
+    clipboardData: dt,
+    bubbles: true,
+    cancelable: true
+  });
+
+  textBox.dispatchEvent(pasteEvent);
+  log(attachments.length + ' file(s) ditempelkan');
+}
+
+function findActiveInput() {
+  return document.querySelector(
+    'div[data-testid="media-caption-input"], ' +
+    'div[contenteditable="true"][data-tab="10"], ' +
+    'div[contenteditable="true"][data-tab="1"], ' +
+    'footer div[contenteditable="true"], ' +
+    'div[data-testid="conversation-compose-box-input"] div[contenteditable="true"], ' +
+    'div[aria-label*="caption"], ' +
+    'div[aria-label*="Caption"], ' +
+    'div[aria-label*="Type a message"], ' +
+    'div[aria-label*="Ketik pesan"]'
+  );
+}
+
+async function sendMessage(phone, message, attachments = []) {
   try {
     log('Memulai pengiriman ke:', phone);
 
@@ -137,8 +176,26 @@ async function sendMessage(phone, message) {
 
     lastProcessedPhone = phone;
 
-    log('Kotak pesan ditemukan');
-    await insertTextToReactNode(textBox, message);
+    if (attachments.length > 0) {
+      log('Upload', attachments.length, 'lampiran');
+      await attachFiles(attachments, textBox);
+      await sleep(4000);
+
+      if (checkForErrorPopup()) {
+        throw new Error('Gagal upload lampiran');
+      }
+
+      const currentInput = findActiveInput();
+      if (currentInput) textBox = currentInput;
+
+      if (message) {
+        await insertTextToReactNode(textBox, message);
+      }
+    } else {
+      log('Kotak pesan ditemukan');
+      await insertTextToReactNode(textBox, message);
+    }
+
     await sleep(1000);
 
     const sendButton =
@@ -171,8 +228,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'ping') {
     sendResponse({ pong: true });
   } else if (message.action === 'send') {
-    const { phone, message: msgText } = message;
-    sendMessage(phone, msgText).then((res) => {
+    const { phone, message: msgText, attachments } = message;
+    sendMessage(phone, msgText, attachments || []).then((res) => {
       sendResponse({ status: res.status, reason: res.reason });
     }).catch((err) => {
       sendResponse({ status: 'fail', reason: err.message });

@@ -16,7 +16,10 @@ const state = {
   tabId: null,
   timeoutId: null,
   rowCount: 0,
-  defaultCountry: 'ID'
+  defaultCountry: 'ID',
+  extractedData: null,
+  extractedGroupName: '',
+  attachments: []
 };
 
 // ============================================================
@@ -71,7 +74,10 @@ const dom = {
   finishBtn: $('#finishBtn'),
   backFrom3: $('#backFrom3'),
   countrySelect: $('#countrySelect'),
-  downloadTemplate: $('#downloadTemplate')
+  downloadTemplate: $('#downloadTemplate'),
+  attachmentDropzone: $('#attachmentDropzone'),
+  attachmentInput: $('#attachmentInput'),
+  attachmentList: $('#attachmentList')
 };
 
 // ============================================================
@@ -284,12 +290,112 @@ function downloadTemplate() {
 
 dom.downloadTemplate.addEventListener('click', downloadTemplate);
 
+// ============================================================
+// ATTACHMENTS
+// ============================================================
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+function getFileIcon(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  if (['png', 'jpg', 'jpeg'].includes(ext)) return 'IMG';
+  if (['mp4', 'mov', '3gp'].includes(ext)) return 'VID';
+  if (ext === 'pdf') return 'PDF';
+  return 'FILE';
+}
+
+function renderAttachmentList() {
+  if (state.attachments.length === 0) {
+    dom.attachmentList.innerHTML = '';
+    return;
+  }
+  const html = state.attachments.map((a, i) =>
+    `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#F0F2F5;border-radius:6px;margin-bottom:4px">
+      <span style="font-size:10px;font-weight:700;color:var(--primary);background:var(--primary-light);padding:2px 6px;border-radius:4px">${getFileIcon(a.name)}</span>
+      <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.name}</span>
+      <span style="font-size:10px;color:var(--text-secondary)">${formatFileSize(a.size)}</span>
+      <button data-index="${i}" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:16px;padding:0 4px">&times;</button>
+    </div>`
+  ).join('');
+  dom.attachmentList.innerHTML = html;
+  dom.attachmentList.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => removeAttachment(Number(btn.dataset.index)));
+  });
+}
+
+async function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const bytes = new Uint8Array(reader.result);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      resolve(btoa(binary));
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function handleAttachmentFiles(files) {
+  for (const file of files) {
+    if (state.attachments.some(a => a.name === file.name && a.size === file.size)) continue;
+    try {
+      const base64 = await readFileAsBase64(file);
+      state.attachments.push({
+        name: file.name,
+        mime: file.type || 'application/octet-stream',
+        size: file.size,
+        base64
+      });
+    } catch (e) {
+      toast('Gagal membaca file: ' + file.name, 'error');
+    }
+  }
+  renderAttachmentList();
+  toast(state.attachments.length + ' file lampiran', 'success');
+}
+
+function removeAttachment(index) {
+  state.attachments.splice(index, 1);
+  renderAttachmentList();
+  if (state.attachments.length === 0) toast('Semua lampiran dihapus', 'info');
+}
+
+dom.attachmentDropzone.addEventListener('click', () => dom.attachmentInput.click());
+
+dom.attachmentDropzone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dom.attachmentDropzone.style.borderColor = 'var(--primary)';
+  dom.attachmentDropzone.style.background = 'var(--primary-light)';
+});
+dom.attachmentDropzone.addEventListener('dragleave', () => {
+  dom.attachmentDropzone.style.borderColor = '';
+  dom.attachmentDropzone.style.background = '';
+});
+dom.attachmentDropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dom.attachmentDropzone.style.borderColor = '';
+  dom.attachmentDropzone.style.background = '';
+  if (e.dataTransfer.files.length) handleAttachmentFiles(e.dataTransfer.files);
+});
+
+dom.attachmentInput.addEventListener('change', () => {
+  if (dom.attachmentInput.files.length) handleAttachmentFiles(dom.attachmentInput.files);
+  dom.attachmentInput.value = '';
+});
+
 dom.countrySelect.addEventListener('change', function () {
   state.defaultCountry = this.value;
   let cc = '';
   try { cc = '+' + libphonenumber.getCountryCallingCode(this.value); } catch (_) { cc = ''; }
   toast('Negara default: ' + this.value + ' (' + cc + ')', 'info');
 });
+
+
 
 // ============================================================
 // MESSAGE TEMPLATE
@@ -381,6 +487,8 @@ dom.finishBtn.addEventListener('click', () => {
   state.currentIndex = 0;
   state.results = [];
   state.status = 'idle';
+  state.attachments = [];
+  renderAttachmentList();
   setStatus('idle');
   dom.backFrom3.style.display = 'flex';
   dom.downloadBtn.style.display = 'none';
@@ -457,8 +565,8 @@ async function startBlast() {
     return;
   }
 
-  if (!state.template.trim()) {
-    toast('Silakan isi template pesan terlebih dahulu', 'error');
+  if (!state.template.trim() && state.attachments.length === 0) {
+    toast('Silakan isi template pesan atau upload lampiran terlebih dahulu', 'error');
     return;
   }
 
@@ -499,9 +607,20 @@ function sendNext() {
     return;
   }
 
-  addLog('info', `Mengirim ke ${phone}...`);
+  const attachments = state.attachments.map(a => ({
+    name: a.name,
+    mime: a.mime,
+    size: a.size,
+    base64: a.base64
+  }));
 
-  chrome.tabs.sendMessage(state.tabId, { action: 'send', phone, message }, (response) => {
+  if (attachments.length > 0) {
+    addLog('info', `Mengirim ke ${phone} dengan ${attachments.length} lampiran...`);
+  } else {
+    addLog('info', `Mengirim ke ${phone}...`);
+  }
+
+  chrome.tabs.sendMessage(state.tabId, { action: 'send', phone, message, attachments }, (response) => {
     if (chrome.runtime.lastError) {
       recordResult(state.currentIndex, 'gagal', 'Content script tidak merespons');
       addLog('error', `${phone}: Gagal - Content script tidak merespons`);
@@ -512,8 +631,9 @@ function sendNext() {
     }
 
     if (response && response.status === 'success') {
+      const attachInfo = attachments.length > 0 ? ` (${attachments.length} lampiran)` : '';
       recordResult(state.currentIndex, 'berhasil', '');
-      addLog('success', `${phone}: Berhasil`);
+      addLog('success', `${phone}: Berhasil${attachInfo}`);
       state.currentIndex++;
       updateStats();
       scheduleNext();

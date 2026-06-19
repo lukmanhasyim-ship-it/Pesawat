@@ -14,3 +14,4 @@ chrome.commands.onCommand.addListener((command) => {
     chrome.runtime.sendMessage({ action: command });
   }
 });
+

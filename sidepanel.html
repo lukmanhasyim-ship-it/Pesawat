@@ -540,6 +540,7 @@
           </div>
         </div>
 
+
         <div class="card" id="dataPreview" style="display:none">
           <div class="card-title">Data Terdeteksi</div>
           <div style="font-size:13px;font-weight:600;margin-bottom:4px">
@@ -610,6 +611,22 @@
           <div class="card-title">Pratinjau Pesan</div>
           <div class="preview-box" id="previewBox">
             <span class="placeholder">Isi template pesan untuk melihat pratinjau</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Lampiran (Opsional)</div>
+          <div id="attachmentDropzone" style="border:2px dashed var(--border);border-radius:var(--radius);padding:24px 16px;text-align:center;cursor:pointer;transition:all 0.3s">
+            <div style="font-size:28px;margin-bottom:6px;opacity:0.4">+</div>
+            <div style="color:var(--text-secondary);font-size:13px">
+              <strong style="color:var(--text)">Klik</strong> atau <strong style="color:var(--text)">tarik file</strong> ke sini
+            </div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">PDF, PNG, JPG, MP4, MOV, 3GP</div>
+            <input type="file" id="attachmentInput" accept=".pdf,.png,.jpg,.jpeg,.mp4,.mov,.3gp" multiple style="display:none">
+          </div>
+          <div id="attachmentList" style="margin-top:8px"></div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:6px">
+            File akan dikirim ke <strong>semua</strong> kontak sebagai caption. Batas ukuran mengikuti kebijakan WhatsApp.
           </div>
         </div>
 
