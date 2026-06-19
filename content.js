@@ -60,6 +60,20 @@ async function insertTextToReactNode(element, text) {
   await sleep(600);
 }
 
+function checkForBusinessPopup() {
+  const blockMsg = document.querySelector('div[data-testid="block-message"]');
+  if (blockMsg) {
+    log('WA Business AI auto-reply block terdeteksi');
+    const toggle = blockMsg.querySelector('a[data-testid="toggle-ai-reply-status"]');
+    if (toggle) {
+      toggle.click();
+      log('Klik "Tanggapi secara manual"');
+      return true;
+    }
+  }
+  return false;
+}
+
 function getChatHeaderName() {
   const header = document.querySelector('header span[data-testid="conversation-info-header-chat-title"]') || 
                  document.querySelector('header span[dir="auto"]');
@@ -132,6 +146,7 @@ async function sendMessage(phone, message, attachments = []) {
         isInvalid = true;
         break;
       }
+      checkForBusinessPopup();
 
       const currentContactName = getChatHeaderName();
 
@@ -172,6 +187,13 @@ async function sendMessage(phone, message, attachments = []) {
 
     if (!textBox) {
       throw new Error('Kotak pesan tidak ditemukan. Gagal memuat obrolan.');
+    }
+
+    if (checkForBusinessPopup()) {
+      await sleep(1500);
+    }
+    if (checkForErrorPopup()) {
+      throw new Error('WA Business AI auto-reply blocking input');
     }
 
     lastProcessedPhone = phone;
