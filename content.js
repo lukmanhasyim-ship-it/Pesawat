@@ -105,21 +105,48 @@ async function attachFiles(attachments, textBox) {
   log(attachments.length + ' file(s) ditempelkan');
 }
 
-function findActiveInput() {
+function findTextBox() {
   return document.querySelector(
-    'div[data-testid="media-caption-input"], ' +
-    'div[contenteditable="true"][data-tab="10"], ' +
-    'div[contenteditable="true"][data-tab="1"], ' +
-    'footer div[contenteditable="true"], ' +
-    'div[data-testid="conversation-compose-box-input"] div[contenteditable="true"], ' +
-    'div[aria-label*="caption"], ' +
-    'div[aria-label*="Caption"], ' +
-    'div[aria-label*="Type a message"], ' +
+    'div[contenteditable="true"][data-tab="10"]'
+  ) || document.querySelector(
+    'div[contenteditable="true"][data-tab="1"]'
+  ) || document.querySelector(
+    'footer div[contenteditable="true"]'
+  ) || document.querySelector(
+    'div[data-testid="conversation-compose-box-input"] div[contenteditable="true"]'
+  ) || document.querySelector(
+    'div[aria-label*="Type a message"]'
+  ) || document.querySelector(
     'div[aria-label*="Ketik pesan"]'
+  ) || document.querySelector(
+    'div[contenteditable="true"]'
+  ) || document.querySelector(
+    'div[role="textbox"]'
+  ) || document.querySelector(
+    'div[contenteditable="true"][spellcheck="true"]'
+  );
+}
+
+function findCaptionBox() {
+  return document.querySelector(
+    'div[data-testid="media-caption-input"]'
+  ) || document.querySelector(
+    'div[data-testid="compose-box"] div[contenteditable="true"]'
+  ) || document.querySelector(
+    'div[aria-label*="Add a caption"]'
+  ) || document.querySelector(
+    'div[aria-label*="Ketik caption"]'
+  ) || document.querySelector(
+    'div[aria-label*="caption"]'
+  ) || document.querySelector(
+    'div[aria-label*="Caption"]'
   );
 }
 
 async function sendMessage(phone, message, attachments = []) {
+  const SEND_TIMEOUT = 60000;
+
+  const exec = async () => {
   try {
     log('Memulai pengiriman ke:', phone);
 
@@ -150,13 +177,7 @@ async function sendMessage(phone, message, attachments = []) {
 
       const currentContactName = getChatHeaderName();
 
-      const candidateTextBox =
-        document.querySelector('div[contenteditable="true"][data-tab="10"]') ||
-        document.querySelector('div[contenteditable="true"][data-tab="1"]') ||
-        document.querySelector('footer div[contenteditable="true"]') ||
-        document.querySelector('div[data-testid="conversation-compose-box-input"] div[contenteditable="true"]') ||
-        document.querySelector('div[aria-label*="Type a message"]') ||
-        document.querySelector('div[aria-label*="Ketik pesan"]');
+      const candidateTextBox = findTextBox();
 
       if (candidateTextBox && isDifferentNumber && currentContactName === previousContactName) {
         log('Header belum berubah, masih loading...');
@@ -207,7 +228,7 @@ async function sendMessage(phone, message, attachments = []) {
         throw new Error('Gagal upload lampiran');
       }
 
-      const currentInput = findActiveInput();
+      const currentInput = findCaptionBox() || findTextBox();
       if (currentInput) textBox = currentInput;
 
       if (message) {
@@ -244,6 +265,13 @@ async function sendMessage(phone, message, attachments = []) {
     log('ERROR:', error.message);
     return { status: 'fail', reason: error.message };
   }
+  };
+
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('TIMEOUT: Proses terhenti (60 detik)')), SEND_TIMEOUT);
+  });
+
+  return Promise.race([exec(), timeoutPromise]);
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

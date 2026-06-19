@@ -16,13 +16,21 @@
 
 Karena ekstensi ini belum dipublikasikan ke Chrome Web Store, Anda harus memasangnya secara manual melalui mode **Developer** Chrome.
 
-### Langkah 1: Unduh / Clone Proyek
+### Langkah 1: Simpan Proyek ke Local Disk
+
+**Simpan folder proyek di local disk (C:\)**, misalnya:
 
 ```
-git clone https://github.com/username/pesawat.git
+C:\Pesawat
 ```
 
-Atau download ZIP dan ekstrak ke folder lokal.
+Atau clone repositori:
+
+```
+git clone https://github.com/username/pesawat.git C:\Pesawat
+```
+
+> Pastikan folder tersimpan di lokal agar ekstensi dapat berfungsi dengan baik.
 
 ### Langkah 2: Buka Halaman Ekstensi Chrome
 
@@ -48,7 +56,14 @@ Setelah berhasil dimuat, ekstensi **Pesawat** akan muncul di daftar ekstensi den
 
 ### Langkah 6: Sematkan Ekstensi (Opsional)
 
-Klik ikon puzzle (Extensi) di toolbar Chrome, lalu klik ikon pin di samping ekstensi Pesawat agar mudah diakses.
+Agar ekstensi mudah diakses setiap saat, sematkan (pin) ke toolbar Chrome:
+
+1. Klik ikon **puzzle** (Extensions) di pojok kanan atas toolbar Chrome.
+2. Cari ekstensi **"Pesawat - Pesan Masal Secepat Kilat"** di daftar.
+3. Klik ikon **pin** di samping nama ekstensi (akan berubah menjadi warna biru/terisi).
+4. Ikon Pesawat akan muncul langsung di toolbar untuk akses cepat.
+
+Setelah disematkan, cukup klik ikon **P** di toolbar untuk membuka side panel Pesawat.
 
 ---
 
@@ -72,7 +87,7 @@ Alternatif: Gunakan shortcut `Alt+S` untuk memulai.
 - Pilih kode negara default sesuai kebutuhan.
 - Klik **"Lanjutkan"**.
 
-### 4. Buat Pesan (Step 2)
+### 4. Buat Pesan & Lampiran (Step 2)
 
 - Tulis template pesan di kolom yang tersedia.
 - Gunakan placeholder `{{NamaKolom}}` untuk data dinamis. Contoh:
@@ -81,6 +96,11 @@ Alternatif: Gunakan shortcut `Alt+S` untuk memulai.
   Silakan segera lakukan pembayaran. Terima kasih.
   ```
 - Pratinjau pesan akan tampil secara real-time menggunakan data baris pertama.
+- **Lampiran (Opsional)**: Upload file yang ingin dilampirkan ke semua kontak:
+  - Format didukung: **PDF**, **PNG**, **JPG**, **MP4**, **MOV**, **3GP**
+  - Tarik & drop atau klik area upload untuk memilih file
+  - File akan dikirim sebagai lampiran, teks template menjadi caption
+  - Ukuran file mengikuti kebijakan WhatsApp Web
 - Atur kecepatan pengiriman dengan slider **Pengaturan Jeda**:
   - **Lambat** (1): jeda 8-15 detik (paling aman)
   - **Normal** (3): jeda 3-8 detik
@@ -156,6 +176,8 @@ Kolom **Nomor** (atau variasi seperti `Telepon`, `Phone`, `No`) **wajib** ada. K
 2. **Jangan gunakan untuk spam**. Ekstensi ini dibuat untuk keperluan komunikasi resmi seperti pengumuman, tagihan, atau undangan.
 3. **Pastikan nomor valid**. Nomor yang tidak terdaftar di WhatsApp akan dicatat sebagai gagal.
 4. **Batasan WhatsApp Web**: WhatsApp Web mungkin membatasi pengiriman jika terdeteksi aktivitas tidak wajar.
+5. **WhatsApp Business**: Jika menggunakan WhatsApp Business dengan **AI auto-reply** aktif, ekstensi akan otomatis mengeklik tombol **"Tanggapi secara manual"** agar pesan dapat terkirim.
+6. **Lampiran file**: File dikirim ke semua kontak sebagai caption. Untuk mengirim lampiran berbeda per kontak, gunakan kolom `Lampiran` di file Excel (pengembangan mendatang).
 
 ---
 
@@ -179,6 +201,16 @@ Kolom **Nomor** (atau variasi seperti `Telepon`, `Phone`, `No`) **wajib** ada. K
 - Periksa format nomor (gunakan format internasional jika perlu).
 - Coba atur jeda lebih lambat.
 - Refresh WhatsApp Web dan coba lagi.
+
+### Lampiran tidak terkirim
+- Pastikan format file didukung (PDF, PNG, JPG, MP4, MOV, 3GP).
+- File terlalu besar mungkin ditolak oleh WhatsApp Web.
+- Coba kurangi jumlah atau ukuran file lampiran.
+
+### WA Business AI auto-reply menghalangi
+- Ekstensi akan otomatis mengeklik **"Tanggapi secara manual"**.
+- Jika masih terblokir, pastikan overlay WA Business benar-benar muncul.
+- Jika masalah berlanjut, nonaktifkan sementara fitur AI auto-reply di pengaturan WhatsApp Business.
 
 ---
 

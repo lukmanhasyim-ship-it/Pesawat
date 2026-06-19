@@ -19,8 +19,15 @@ const state = {
   defaultCountry: 'ID',
   extractedData: null,
   extractedGroupName: '',
-  attachments: []
+  attachments: [],
+  heartbeatTimer: null,
+  heartbeatFails: 0,
+  startTime: null
 };
+
+// ETA live countdown
+let etaInterval = null;
+let etaSecondsLeft = 0;
 
 // ============================================================
 // DOM REFERENCES
@@ -77,7 +84,14 @@ const dom = {
   downloadTemplate: $('#downloadTemplate'),
   attachmentDropzone: $('#attachmentDropzone'),
   attachmentInput: $('#attachmentInput'),
-  attachmentList: $('#attachmentList')
+  attachmentList: $('#attachmentList'),
+  confirmModal: $('#confirmModal'),
+  modalConfirm: $('#modalConfirm'),
+  modalCancel: $('#modalCancel'),
+  modalCount: $('#modalCount'),
+  modalAttach: $('#modalAttach'),
+  modalAttachCount: $('#modalAttachCount'),
+  etaText: $('#etaText')
 };
 
 // ============================================================
@@ -312,15 +326,24 @@ function renderAttachmentList() {
     dom.attachmentList.innerHTML = '';
     return;
   }
-  const html = state.attachments.map((a, i) =>
-    `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#F0F2F5;border-radius:6px;margin-bottom:4px">
-      <span style="font-size:10px;font-weight:700;color:var(--primary);background:var(--primary-light);padding:2px 6px;border-radius:4px">${getFileIcon(a.name)}</span>
+  const items = state.attachments.map((a, i) => {
+    const ext = a.name.split('.').pop().toLowerCase();
+    const isImage = ['png', 'jpg', 'jpeg'].includes(ext);
+    let thumbHtml = '';
+    if (isImage && a.fileObj) {
+      const url = URL.createObjectURL(a.fileObj);
+      thumbHtml = `<img src="${url}" style="width:32px;height:32px;border-radius:4px;object-fit:cover;flex-shrink:0">`;
+    } else {
+      thumbHtml = `<span style="font-size:10px;font-weight:700;color:var(--primary);background:var(--primary-light);padding:2px 6px;border-radius:4px;flex-shrink:0">${getFileIcon(a.name)}</span>`;
+    }
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px">
+      ${thumbHtml}
       <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.name}</span>
       <span style="font-size:10px;color:var(--text-secondary)">${formatFileSize(a.size)}</span>
-      <button data-index="${i}" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:16px;padding:0 4px">&times;</button>
-    </div>`
-  ).join('');
-  dom.attachmentList.innerHTML = html;
+      <button data-index="${i}" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:16px;padding:0 4px;flex-shrink:0">&times;</button>
+    </div>`;
+  }).join('');
+  dom.attachmentList.innerHTML = items;
   dom.attachmentList.querySelectorAll('button').forEach(btn => {
     btn.addEventListener('click', () => removeAttachment(Number(btn.dataset.index)));
   });
@@ -343,20 +366,25 @@ async function readFileAsBase64(file) {
 async function handleAttachmentFiles(files) {
   for (const file of files) {
     if (state.attachments.some(a => a.name === file.name && a.size === file.size)) continue;
-    try {
-      const base64 = await readFileAsBase64(file);
-      state.attachments.push({
-        name: file.name,
-        mime: file.type || 'application/octet-stream',
-        size: file.size,
-        base64
-      });
-    } catch (e) {
-      toast('Gagal membaca file: ' + file.name, 'error');
-    }
+    state.attachments.push({
+      name: file.name,
+      mime: file.type || 'application/octet-stream',
+      size: file.size,
+      fileObj: file
+    });
   }
   renderAttachmentList();
   toast(state.attachments.length + ' file lampiran', 'success');
+}
+
+async function getAttachmentBase64(att) {
+  if (att.base64) return att.base64;
+  if (att.fileObj) {
+    const base64 = await readFileAsBase64(att.fileObj);
+    att.base64 = base64;
+    return base64;
+  }
+  return '';
 }
 
 function removeAttachment(index) {
@@ -495,13 +523,41 @@ dom.finishBtn.addEventListener('click', () => {
   dom.pauseBtn.style.display = 'none';
   dom.resumeBtn.style.display = 'none';
   dom.stopBtn.style.display = 'none';
+  stopEtaTimer();
+  dom.etaText.textContent = '';
   dom.logContainer.innerHTML =
     '<div style="text-align:center;color:var(--text-secondary);font-size:12px;padding:20px">Menunggu eksekusi dimulai...</div>';
   dom.progressFill.style.width = '0%';
   dom.progressText.textContent = '0 / 0';
   goToStep(1);
 });
-dom.toStep3.addEventListener('click', startBlast);
+dom.toStep3.addEventListener('click', () => {
+  if (state.data.length === 0) {
+    toast('Tidak ada data untuk dikirim', 'error');
+    return;
+  }
+  if (!state.template.trim() && state.attachments.length === 0) {
+    toast('Silakan isi template pesan atau upload lampiran terlebih dahulu', 'error');
+    return;
+  }
+  dom.modalCount.textContent = state.data.length;
+  if (state.attachments.length > 0) {
+    dom.modalAttach.style.display = 'inline';
+    dom.modalAttachCount.textContent = state.attachments.length;
+  } else {
+    dom.modalAttach.style.display = 'none';
+  }
+  dom.confirmModal.style.display = 'flex';
+});
+
+dom.modalCancel.addEventListener('click', () => {
+  dom.confirmModal.style.display = 'none';
+});
+
+dom.modalConfirm.addEventListener('click', () => {
+  dom.confirmModal.style.display = 'none';
+  startBlast();
+});
 
 // ============================================================
 // WHATSAPP TAB & CONTENT SCRIPT
@@ -543,6 +599,85 @@ function setStatus(newStatus) {
 }
 
 // ============================================================
+// TIMEOUT + STATE + HEARTBEAT HELPERS
+// ============================================================
+function sendWithTimeout(tabId, msg, timeout = 30000) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      resolve({ status: 'fail', reason: 'TIMEOUT: Kontak tidak merespon (30 detik)' });
+    }, timeout);
+
+    chrome.tabs.sendMessage(tabId, msg, (response) => {
+      clearTimeout(timer);
+      if (chrome.runtime.lastError) {
+        resolve({ status: 'fail', reason: 'Content script tidak merespons' });
+      } else {
+        resolve(response);
+      }
+    });
+  });
+}
+
+function saveState() {
+  chrome.storage.session.set({
+    blastState: {
+      currentIndex: state.currentIndex,
+      results: state.results,
+      status: state.status,
+      template: state.template,
+      delayMin: state.delayMin,
+      delayMax: state.delayMax
+    }
+  });
+}
+
+function loadState(callback) {
+  chrome.storage.session.get('blastState', (data) => {
+    if (data.blastState && data.blastState.status === 'running') {
+      Object.assign(state, data.blastState);
+      state.status = 'paused';
+      setStatus('paused');
+      dom.etaText.textContent = '';
+      addLog('info', 'State dipulihkan. Klik Lanjutkan untuk melanjutkan.');
+      goToStep(3);
+      dom.backFrom3.style.display = 'none';
+      dom.pauseBtn.style.display = 'none';
+      dom.resumeBtn.style.display = 'inline-flex';
+      dom.stopBtn.style.display = 'none';
+      updateStats();
+    }
+    if (callback) callback();
+  });
+}
+
+function startHeartbeat() {
+  state.heartbeatFails = 0;
+  state.heartbeatTimer = setInterval(() => {
+    if (!state.tabId) return;
+    chrome.tabs.sendMessage(state.tabId, { action: 'ping' }, (response) => {
+      if (chrome.runtime.lastError || !response || !response.pong) {
+        state.heartbeatFails++;
+        if (state.heartbeatFails >= 2 && state.status === 'running') {
+          pauseBlast();
+          addLog('error', 'Koneksi ke WhatsApp Web terputus. Eksekusi dijeda.');
+          toast('WhatsApp Web terputus. Coba refresh halaman.', 'error');
+        }
+      } else {
+        state.heartbeatFails = 0;
+      }
+    });
+  }, 15000);
+}
+
+function stopHeartbeat() {
+  if (state.heartbeatTimer) {
+    clearInterval(state.heartbeatTimer);
+    state.heartbeatTimer = null;
+  }
+  state.heartbeatFails = 0;
+}
+
+// ============================================================
 // BLAST EXECUTION
 // ============================================================
 async function startBlast() {
@@ -577,16 +712,20 @@ async function startBlast() {
 
   state.currentIndex = 0;
   state.results = [];
+  state.startTime = Date.now();
   setStatus('running');
   updateStats();
+  saveState();
+  startHeartbeat();
 
+  dom.etaText.textContent = 'Menghitung estimasi...';
   dom.logContainer.innerHTML = '';
   addLog('info', 'Memulai pengiriman...');
 
   sendNext();
 }
 
-function sendNext() {
+async function sendNext() {
   if (state.status !== 'running') return;
 
   if (state.currentIndex >= state.data.length) {
@@ -603,51 +742,46 @@ function sendNext() {
     addLog('error', `Baris ${state.currentIndex + 1}: No. telepon kosong`);
     state.currentIndex++;
     updateStats();
+    saveState();
     scheduleNext();
     return;
   }
 
-  const attachments = state.attachments.map(a => ({
-    name: a.name,
-    mime: a.mime,
-    size: a.size,
-    base64: a.base64
-  }));
+  const pendingAttachments = [];
+  for (const a of state.attachments) {
+    const base64 = await getAttachmentBase64(a);
+    pendingAttachments.push({ name: a.name, mime: a.mime, size: a.size, base64 });
+  }
 
-  if (attachments.length > 0) {
-    addLog('info', `Mengirim ke ${phone} dengan ${attachments.length} lampiran...`);
+  if (pendingAttachments.length > 0) {
+    addLog('info', `Mengirim ke ${phone} dengan ${pendingAttachments.length} lampiran...`);
   } else {
     addLog('info', `Mengirim ke ${phone}...`);
   }
 
-  chrome.tabs.sendMessage(state.tabId, { action: 'send', phone, message, attachments }, (response) => {
-    if (chrome.runtime.lastError) {
-      recordResult(state.currentIndex, 'gagal', 'Content script tidak merespons');
-      addLog('error', `${phone}: Gagal - Content script tidak merespons`);
-      state.currentIndex++;
-      updateStats();
-      scheduleNext();
-      return;
-    }
+  const response = await sendWithTimeout(state.tabId, {
+    action: 'send', phone, message, attachments: pendingAttachments
+  }, 30000);
 
-    if (response && response.status === 'success') {
-      const attachInfo = attachments.length > 0 ? ` (${attachments.length} lampiran)` : '';
-      recordResult(state.currentIndex, 'berhasil', '');
-      addLog('success', `${phone}: Berhasil${attachInfo}`);
-      state.currentIndex++;
-      updateStats();
-      scheduleNext();
-    } else if (response && response.status === 'navigating') {
-      addLog('info', `${phone}: WA navigasi, menunggu...`);
-    } else {
-      const reason = response && response.reason ? response.reason : 'Error tidak diketahui';
-      recordResult(state.currentIndex, 'gagal', reason);
-      addLog('error', `${phone}: Gagal - ${reason}`);
-      state.currentIndex++;
-      updateStats();
-      scheduleNext();
-    }
-  });
+  if (response && response.status === 'success') {
+    const attachInfo = pendingAttachments.length > 0 ? ` (${pendingAttachments.length} lampiran)` : '';
+    recordResult(state.currentIndex, 'berhasil', '');
+    addLog('success', `${phone}: Berhasil${attachInfo}`);
+    state.currentIndex++;
+    updateStats();
+    saveState();
+    scheduleNext();
+  } else if (response && response.status === 'navigating') {
+    addLog('info', `${phone}: WA navigasi, menunggu...`);
+  } else {
+    const reason = response && response.reason ? response.reason : 'Error tidak diketahui';
+    recordResult(state.currentIndex, 'gagal', reason);
+    addLog('error', `${phone}: Gagal - ${reason}`);
+    state.currentIndex++;
+    updateStats();
+    saveState();
+    scheduleNext();
+  }
 }
 
 function scheduleNext() {
@@ -725,9 +859,12 @@ function pauseBlast() {
   if (state.status !== 'running') return;
   if (state.timeoutId) clearTimeout(state.timeoutId);
   setStatus('paused');
+  stopHeartbeat();
+  stopEtaTimer();
+  saveState();
   dom.pauseBtn.style.display = 'none';
   dom.resumeBtn.style.display = 'inline-flex';
-  addLog('info', '⏸ Eksekusi dijeda');
+  addLog('info', 'Eksekusi dijeda');
 }
 
 function resumeBlast() {
@@ -735,31 +872,75 @@ function resumeBlast() {
   setStatus('running');
   dom.pauseBtn.style.display = 'inline-flex';
   dom.resumeBtn.style.display = 'none';
-  addLog('info', '▶ Melanjutkan pengiriman...');
+  startHeartbeat();
+  dom.etaText.textContent = 'Menghitung estimasi...';
+  addLog('info', 'Melanjutkan pengiriman...');
   sendNext();
 }
 
 function stopBlast() {
   if (state.timeoutId) clearTimeout(state.timeoutId);
   setStatus('stopped');
+  stopHeartbeat();
+  stopEtaTimer();
+  chrome.storage.session.remove('blastState');
   dom.pauseBtn.style.display = 'none';
   dom.resumeBtn.style.display = 'none';
   dom.stopBtn.style.display = 'none';
   dom.backFrom3.style.display = 'flex';
   dom.downloadBtn.style.display = 'inline-flex';
-  addLog('info', '⏹ Eksekusi dihentikan pengguna');
+  addLog('info', 'Eksekusi dihentikan pengguna');
   toast('Eksekusi dihentikan', 'info');
 }
 
 function completeBlast() {
   setStatus('completed');
+  stopHeartbeat();
+  stopEtaTimer();
+  dom.etaText.textContent = 'Selesai';
+  chrome.storage.session.remove('blastState');
   dom.pauseBtn.style.display = 'none';
   dom.resumeBtn.style.display = 'none';
   dom.stopBtn.style.display = 'none';
   dom.backFrom3.style.display = 'flex';
   dom.downloadBtn.style.display = 'inline-flex';
-  addLog('info', '✅ Semua pengiriman selesai!');
+  addLog('info', 'Semua pengiriman selesai!');
   toast('Semua pesan berhasil dikirim!', 'success');
+}
+
+// ============================================================
+// ETA LIVE COUNTDOWN
+// ============================================================
+function startEtaTimer() {
+  if (etaInterval) clearInterval(etaInterval);
+  if (etaSecondsLeft <= 0) return;
+  etaInterval = setInterval(() => {
+    etaSecondsLeft--;
+    if (etaSecondsLeft <= 0) {
+      clearInterval(etaInterval);
+      etaInterval = null;
+    }
+    displayETA();
+  }, 1000);
+}
+
+function stopEtaTimer() {
+  if (etaInterval) {
+    clearInterval(etaInterval);
+    etaInterval = null;
+  }
+  etaSecondsLeft = 0;
+  dom.etaText.textContent = '';
+}
+
+function displayETA() {
+  if (etaSecondsLeft > 0) {
+    const m = Math.floor(etaSecondsLeft / 60);
+    const s = etaSecondsLeft % 60;
+    dom.etaText.textContent = `Estimasi sisa: ${m} menit ${s} detik`;
+  } else {
+    dom.etaText.textContent = 'Sebentar lagi...';
+  }
 }
 
 // ============================================================
@@ -780,6 +961,18 @@ function updateStats() {
   const pct = total > 0 ? Math.round((sent / total) * 100) : 0;
   dom.progressFill.style.width = pct + '%';
   dom.progressText.textContent = `${sent} / ${total} (${pct}%)`;
+
+  if (state.startTime && sent > 1 && remaining > 0) {
+    const elapsed = (Date.now() - state.startTime) / 1000;
+    const avgPerContact = elapsed / sent;
+    const etaSeconds = Math.round(avgPerContact * remaining);
+    if (etaSeconds > 0 && etaSeconds < 86400) {
+      etaSecondsLeft = etaSeconds;
+      startEtaTimer();
+    } else if (etaSeconds >= 86400) {
+      dom.etaText.textContent = '> 24 jam';
+    }
+  }
 }
 
 // ============================================================
@@ -880,4 +1073,4 @@ chrome.runtime.onMessage.addListener((message) => {
 // ============================================================
 // INIT
 // ============================================================
-goToStep(1);
+loadState(() => goToStep(state.currentStep));

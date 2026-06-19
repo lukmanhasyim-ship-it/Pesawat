@@ -26,7 +26,19 @@
     }
   ],
   "action": {
-    "default_title": "Pesawat - WA Blast"
+    "default_title": "Pesawat - WA Blast",
+    "default_icon": {
+      "16": "LOGO.png",
+      "32": "LOGO.png",
+      "48": "LOGO.png",
+      "128": "LOGO.png"
+    }
+  },
+  "icons": {
+    "16": "LOGO.png",
+    "32": "LOGO.png",
+    "48": "LOGO.png",
+    "128": "LOGO.png"
   },
   "web_accessible_resources": [{
     "resources": ["click.js"],
