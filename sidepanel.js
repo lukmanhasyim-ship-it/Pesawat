@@ -262,7 +262,7 @@ dom.removeFile.addEventListener('click', removeFile);
 
 function downloadTemplate() {
   const ws = XLSX.utils.aoa_to_sheet([
-    ['No', 'Nama', 'Nomor WA', 'Keterangan'],
+    ['No Urut', 'Nama', 'No WA', 'Keterangan'],
     ['1', 'Andi', '6281234567890', 'Pelanggan A'],
     ['2', 'Budi', '6289876543210', 'Pelanggan B']
   ]);
@@ -565,7 +565,7 @@ function cleanPhone(raw) {
 }
 
 function extractPhone(row) {
-  const phoneKeys = ['No', 'No.', 'Nomor', 'Phone', 'Telepon', 'HP', 'No HP', 'No.HP', 'WA', 'WhatsApp', 'No WA', 'No.WA'];
+  const phoneKeys = ['Phone', 'Telepon', 'HP', 'No HP', 'No.HP', 'WA', 'WhatsApp', 'No WA', 'No.WA', 'Nomor WA', 'Nomor Telepon', 'Nomor HP', 'Nomor WhatsApp'];
   for (const key of phoneKeys) {
     if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
       return cleanPhone(String(row[key]));
